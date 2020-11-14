@@ -11,7 +11,7 @@ from typing import List, Tuple, Union
 
 from msrestazure.azure_exceptions import CloudError
 from nnstorm_cloud.azure.api import AzureApi, AzureError
-from nnstorm_cloud.azure.core.utils import run_shell_command
+from nnstorm_cloud.core.utils import run_shell_command
 
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.compute.models import (
@@ -24,41 +24,19 @@ from azure.mgmt.compute.models import (
     VirtualMachineEvictionPolicyTypes,
     VirtualMachinePriorityTypes,
 )
-from azure.mgmt.containerservice import ContainerServiceClient
-from azure.mgmt.containerservice.models import (
-    ContainerServiceNetworkProfile,
-    ManagedCluster,
-    ManagedClusterAgentPoolProfile,
-    ManagedClusterAPIServerAccessProfile,
-    ManagedClusterServicePrincipalProfile,
-)
 from azure.mgmt.dns import DnsManagementClient
 from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.network.models import (
-    AzureFirewall,
-    AzureFirewallIPConfiguration,
     NetworkInterface,
     NetworkSecurityGroup,
-    PrivateEndpoint,
-    PrivateLinkServiceConnection,
     PublicIPAddress,
     PublicIPAddressDnsSettings,
-    Route,
-    RouteTable,
     Subnet,
     VirtualNetwork,
     VirtualNetworkPeering,
 )
 from azure.mgmt.privatedns import PrivateDnsManagementClient
 from azure.mgmt.privatedns.models import ARecord, PrivateZone, RecordSet, VirtualNetworkLink
-from azure.mgmt.rdbms.mysql import MySQLManagementClient
-from azure.mgmt.rdbms.mysql.models import (
-    ServerForCreate,
-    ServerPropertiesForDefaultCreate,
-    ServerVersion,
-    Sku,
-    StorageProfile,
-)
 from azure.mgmt.resource import ResourceManagementClient
 from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.storage.models import NetworkRuleSet
