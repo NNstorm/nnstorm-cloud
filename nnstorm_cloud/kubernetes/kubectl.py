@@ -332,3 +332,12 @@ class KubeControl:
         """
         out, _ = self.kube_cmd(["logs", pod_name] + ([] if not since else [f"--since={since}"]))
         return out
+
+    def scale_deployment(self, name: str = None, replicas: int = 1) -> None:
+        """Scale replicas in a deployment
+
+        Args:
+            name (str, optional): name of the deployment. Defaults to None.
+            replicas (int, optional): replica count. Defaults to 1.
+        """
+        self.kube_cmd(["scale", "deployment", name, "--replicas", str(replicas)])

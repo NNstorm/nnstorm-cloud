@@ -729,7 +729,7 @@ class AzureManager(AzureApi):
         _ = link.result()
         self.logger.info(f"Private DNS is linked to VNET")
 
-    def create_private_dns_zone(self, zone: str, link_vnets: List[Tuple[str, str]]) -> None:
+    def create_private_dns_zone(self, zone: str, link_vnets: List[Tuple[str, str]] = [], rsg: str = None) -> None:
         """Create private DNS zone in Azure
 
         Args:
@@ -737,13 +737,13 @@ class AzureManager(AzureApi):
         """
         self.logger.info(f"Creating private DNS zone: {zone}")
         dns = self.client(PrivateDnsManagementClient).private_zones.create_or_update(
-            self.rsg, zone, PrivateZone(location="global")
+            self.rsg if not rsg else rsg, zone, PrivateZone(location="global")
         )
         dns = dns.result()
 
         for vnet_rsg, vnet_name in link_vnets:
             self.private_dns_link_to_vnet(
-                self.rsg,
+                rsg,
                 zone,
                 vnet_rsg,
                 vnet_name,
@@ -751,7 +751,7 @@ class AzureManager(AzureApi):
 
         self.logger.info("Private DNS Zone created, VNETs linked")
 
-    def dns_create_a_record(self, name: str, zone: str, public_ips: List[str]) -> None:
+    def dns_create_a_record(self, name: str, zone: str, public_ips: List[str], rsg: str = None) -> None:
         """Assign a public DNS A record to an IP address
 
         Args:
@@ -760,7 +760,7 @@ class AzureManager(AzureApi):
         """
         self.logger.info(f"Creating DNS record {name} for {public_ips}")
         self.client(DnsManagementClient).record_sets.create_or_update(
-            self.rsg,
+            self.rsg if not rsg else rsg,
             zone,
             name,
             "A",
@@ -768,7 +768,7 @@ class AzureManager(AzureApi):
         )
         self.logger.info("Record created")
 
-    def dns_delete_a_record(self, name: str, zone: str) -> None:
+    def dns_delete_a_record(self, name: str, zone: str, rsg: str = None) -> None:
         """Delete a public A record from the DNS zone
 
         Args:
@@ -776,13 +776,13 @@ class AzureManager(AzureApi):
         """
         self.logger.info(f"Deleting DNS record for {name}")
         self.client(DnsManagementClient).record_sets.delete(
-            self.rsg,
+            self.rsg if not rsg else rsg,
             zone,
             name,
             "A",
         )
 
-    def private_dns_delete_a_record(self, name: str, zone: str) -> None:
+    def private_dns_delete_a_record(self, name: str, zone: str, rsg: str = None) -> None:
         """Delete a private DNS A record
 
         Args:
@@ -790,13 +790,13 @@ class AzureManager(AzureApi):
         """
         self.logger.info(f"Deleting Private DNS record for {name}")
         self.client(PrivateDnsManagementClient).record_sets.delete(
-            self.rsg,
+            self.rsg if not rsg else rsg,
             zone,
             "A",
             name,
         )
 
-    def private_dns_create_a_record(self, name: str, ip: str, zone: str = None) -> None:
+    def private_dns_create_a_record(self, name: str, ip: str, zone: str = None, rsg: str = None) -> None:
         """Create a Private DNS A record
 
         Args:
@@ -812,7 +812,7 @@ class AzureManager(AzureApi):
             ips = [ARecord(ipv4_address=i) for i in ip]
 
         self.client(PrivateDnsManagementClient).record_sets.create_or_update(
-            self.rsg,
+            self.rsg if not rsg else rsg,
             zone,
             "A",
             name,
