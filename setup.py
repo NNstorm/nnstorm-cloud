@@ -2,6 +2,10 @@ import setuptools
 
 VERSION = "0.4.1"
 
+with open("requirements.txt", "r") as f:
+    reqs = [l.replace("\n", "") for l in f.readlines()]
+
+
 setuptools.setup(
     name="nnstorm-cloud",
     version=VERSION,
@@ -17,5 +21,6 @@ setuptools.setup(
         "Programming Language :: Python :: 3.9",
         "Operating System :: OS Independent",
     ],
+    install_requires=reqs,
     python_requires=">=3.7",
 )
