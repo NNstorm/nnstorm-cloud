@@ -46,7 +46,6 @@ class AzureManager(AzureApi):
     def __init__(
         self,
         rsg: str = None,
-        keyvault: Union[str, AzureKeyVault] = None,
         async_mode: bool = False,
         auth_path: Path = None,
         location: str = None,
@@ -67,13 +66,6 @@ class AzureManager(AzureApi):
 
         self._async_mode = async_mode
 
-        if not keyvault:
-            self.keyvault = AzureKeyVault(auth_path=auth_path)
-        elif isinstance(keyvault, str):
-            self.keyvault = AzureKeyVault(keyvault, auth_path=auth_path)
-        elif isinstance(keyvault, AzureKeyVault):
-            self.keyvault = keyvault
-
         self.config = {}
         self.rsg = rsg
 
@@ -91,6 +83,14 @@ class AzureManager(AzureApi):
             self.logger.info("Waiting for RSG to be available.")
 
         self.logger.debug("Azure Manager API init completed.")
+
+    def set_async(self, async_on: bool = True) -> None:
+        """Set async mode
+
+        Args:
+            async_on (bool, optional): Whether to use async execution. Defaults to True.
+        """
+        self._async_mode = async_on
 
     def _async_wait(self, handle, force_wait=False) -> None:
         """If async mode is turned on, proceed, otherwise wait for handle's completion

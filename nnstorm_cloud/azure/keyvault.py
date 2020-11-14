@@ -11,7 +11,7 @@ from nnstorm_cloud.azure.api import AzureApi
 
 from azure.keyvault.secrets import SecretClient
 from azure.mgmt.keyvault import KeyVaultManagementClient
-from azure.mgmt.keyvault.models import NetworkRuleSet, VirtualNetworkRule
+from azure.mgmt.keyvault.models import NetworkRuleSet, VaultCheckNameAvailabilityParameters, VirtualNetworkRule
 
 
 class AzureKeyVault(AzureApi):
@@ -29,8 +29,8 @@ class AzureKeyVault(AzureApi):
         self.name = keyvault_name
         self.uri = f"https://{self.name}.vault.azure.net"
 
-        self.secret_client = SecretClient(vault_url=self.uri, credential=self.credentials, version="7.0")
-        self.keyvault_client = KeyVaultManagementClient(self.credentials, self.subscription_id)
+        self.secret_client = SecretClient(vault_url=self.uri, credential=self.client_secret_credentials, version="7.0")
+        self.keyvault_client = KeyVaultManagementClient(self.client_secret_credentials, self.subscription_id)
 
         self.logger.debug(f"Keyvault manager ready: {self.name}")
 
@@ -129,10 +129,9 @@ class AzureKeyVault(AzureApi):
         self.logger.info(f"Deleting keyvault {self.name}")
         try:
             d = self.keyvault_client.vaults.delete(rsg, self.name)
-            d.wait()
             if purge:
                 self.logger.info(f"Purging keyvault {self.name}")
-                p = self.keyvault_client.vaults.purge_deleted(self.name, location)
+                p = self.keyvault_client.vaults.begin_purge_deleted(self.name, location)
                 p.wait()
         except Exception as e:
             if not fail_ok:
@@ -150,21 +149,18 @@ class AzureKeyVault(AzureApi):
         """
         self.logger.info(f"Create or update KeyVault running for: {self.name}")
 
-        tenant_id = self._get_tenant_id()
-        keyvault_client = self.client(KeyVaultManagementClient)
-
         if not self.check_name_available():
-            raise RuntimeError("Keyvault name is taken by deleted keyvault.")
+            raise RuntimeError("Keyvault name is taken by deleted keyvault or is being used.")
 
         configuration = {
             "location": location,
             "properties": {
-                "sku": {"name": "standard"},
-                "tenant_id": tenant_id,
+                "sku": {"name": "standard", "family": "A"},
+                "tenant_id": self._get_tenant_id(),
                 "enable_soft_delete": soft_delete,
                 "access_policies": [
                     {
-                        "tenant_id": tenant_id,
+                        "tenant_id": self._get_tenant_id(),
                         "object_id": self.get_object_id(),
                         "permissions": {"keys": ["all"], "secrets": ["all", "purge"]},
                     }
@@ -177,7 +173,7 @@ class AzureKeyVault(AzureApi):
                 default_action="Deny", ip_rules=[], virtual_network_rules=[VirtualNetworkRule(id=i) for i in subnet_ids]
             )
 
-        kv = keyvault_client.vaults.create_or_update(rsg, self.name, configuration)
+        kv = self.keyvault_client.vaults.begin_create_or_update(rsg, self.name, configuration)
         kv.wait()
 
         while True:
@@ -202,8 +198,12 @@ class AzureKeyVault(AzureApi):
 
         deleted_vaults = self.keyvault_client.vaults.list_deleted()
         names = [i.name for i in deleted_vaults]
+        print(names)
 
-        available = self.keyvault_client.vaults.check_name_availability(self.name)
+        available = self.keyvault_client.vaults.check_name_availability(
+            VaultCheckNameAvailabilityParameters(name=self.name)
+        )
+        print(available)
 
         if (self.name in names) or not available.name_available:
             return False
