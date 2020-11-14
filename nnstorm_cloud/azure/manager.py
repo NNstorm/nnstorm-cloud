@@ -49,6 +49,7 @@ class AzureManager(AzureApi):
         async_mode: bool = False,
         auth_path: Path = None,
         location: str = None,
+        create_rsg: bool = True,
     ):
         """Initialize the AzureManager class, create rsg if it does not exist.
 
@@ -58,6 +59,7 @@ class AzureManager(AzureApi):
             async_mode (bool, optional): whether to use async mode. Defaults to False.
             auth_path (Path, optional): location of azure auth json file. Defaults to None.
             location (str, optional): location of the azure resource group
+            create_rsg (bool, optional): whether to create the Azure rsg
 
         Raises:
             AzureError: If anything is misconfigured, an AzureError is raised.
@@ -70,17 +72,18 @@ class AzureManager(AzureApi):
         self.rsg = rsg
 
         # create or update resource group if does not exist:
-        self.client(ResourceManagementClient).resource_groups.create_or_update(self.rsg, {"location": location})
+        if create_rsg:
+            self.client(ResourceManagementClient).resource_groups.create_or_update(self.rsg, {"location": location})
 
-        while True:
-            time.sleep(0.5)
-            rsg_state = (
-                self.client(ResourceManagementClient).resource_groups.get(self.rsg).properties.provisioning_state
-            )
-            if rsg_state == "Succeeded":
-                break
+            while True:
+                time.sleep(0.5)
+                rsg_state = (
+                    self.client(ResourceManagementClient).resource_groups.get(self.rsg).properties.provisioning_state
+                )
+                if rsg_state == "Succeeded":
+                    break
 
-            self.logger.info("Waiting for RSG to be available.")
+                self.logger.info("Waiting for RSG to be available.")
 
         self.logger.debug("Azure Manager API init completed.")
 

@@ -32,6 +32,8 @@ class AzureKeyVault(AzureApi):
         self.secret_client = SecretClient(vault_url=self.uri, credential=self.client_secret_credentials, version="7.0")
         self.keyvault_client = KeyVaultManagementClient(self.client_secret_credentials, self.subscription_id)
 
+        self.exists = self.name in [i.name for i in self.keyvault_client.vaults.list()]
+
         self.logger.debug(f"Keyvault manager ready: {self.name}")
 
     def get_secret(self, name: str) -> str:
@@ -137,6 +139,8 @@ class AzureKeyVault(AzureApi):
             if not fail_ok:
                 raise e
 
+        self.exists = False
+
     def create_keyvault(self, rsg: str, location: str, soft_delete: bool = True, subnet_ids: List[str] = None):
         """Creates a key vault object in Azure
 
@@ -185,6 +189,8 @@ class AzureKeyVault(AzureApi):
             else:
                 self.delete_secret("test")
                 break
+
+        self.exists = True
 
     def check_name_available(self) -> bool:
         """Check if keyvault name is available
