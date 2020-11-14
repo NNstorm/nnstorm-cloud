@@ -39,6 +39,12 @@ class AzureApi:
             raise AzureError()
         self.azure_auth_path = azure_auth_path
 
+        self.client_secret_credentials = ClientSecretCredential(
+            client_secret=self._get_client_secret(), client_id=self._get_client_id(), tenant_id=self._get_tenant_id()
+        )
+        self.service_principal_credentials = ServicePrincipalCredentials(
+            client_id=self._get_client_id(), secret=self._get_client_secret(), tenant=self._get_tenant_id()
+        )
         self.credentials = self._get_client_secret_credential()
         self.subscription_id = self._get_subscription_id()
 
@@ -96,14 +102,11 @@ class AzureApi:
         Returns:
             ClientSecretCredential: CS credentials to be used with clients
         """
-        credential = ClientSecretCredential(
-            client_secret=self._get_client_secret(), client_id=self._get_client_id(), tenant_id=self._get_tenant_id()
-        )
 
         if resource_id:
-            return CredentialWrapper(credential, resource_id=resource_id)
+            return CredentialWrapper(self.client_secret_credentials, resource_id=resource_id)
         else:
-            return CredentialWrapper(credential)
+            return CredentialWrapper(self.client_secret_credentials)
 
     def _get_subscription_id(self) -> str:
         """Get the subscription ID string from auth file.

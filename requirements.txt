@@ -20,3 +20,6 @@ azure-storage-blob
 azure-storage-file
 
 coloredlogs
+
+pytest
+pytest-parallel

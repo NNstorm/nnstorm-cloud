@@ -1,10 +1,13 @@
 import setuptools
 
+VERSION = "0.4.1"
+
 setuptools.setup(
     name="nnstorm-cloud",
-    version="0.4.1",
+    version=VERSION,
     author="Geza Velkey",
     author_email="geza@nnstorm.com",
+    url="https://github.com/NNstorm/nnstorm-cloud",
     description="NNstorm cloud automation",
     packages=setuptools.find_packages(),
     classifiers=[
