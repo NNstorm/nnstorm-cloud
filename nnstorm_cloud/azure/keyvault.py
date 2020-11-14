@@ -17,7 +17,7 @@ from azure.mgmt.keyvault.models import NetworkRuleSet, VaultCheckNameAvailabilit
 class AzureKeyVault(AzureApi):
     """Azure KeyVault API to set/get secrets from a given Keyvault on Azure"""
 
-    def __init__(self, keyvault_name: str, auth_path: Path = None):
+    def __init__(self, keyvault_name: str, auth_path: Path):
         """Initialize the Azure Keyvault client
 
         Args:

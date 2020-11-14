@@ -7,10 +7,11 @@ import string
 import sys
 import time
 from pathlib import Path
-from typing import List, Union
+from typing import List, Tuple, Union
 
 from msrestazure.azure_exceptions import CloudError
 from nnstorm_cloud.azure.api import AzureApi, AzureError
+from nnstorm_cloud.azure.core.utils import run_shell_command
 
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.compute.models import (
@@ -23,17 +24,47 @@ from azure.mgmt.compute.models import (
     VirtualMachineEvictionPolicyTypes,
     VirtualMachinePriorityTypes,
 )
+from azure.mgmt.containerservice import ContainerServiceClient
+from azure.mgmt.containerservice.models import (
+    ContainerServiceNetworkProfile,
+    ManagedCluster,
+    ManagedClusterAgentPoolProfile,
+    ManagedClusterAPIServerAccessProfile,
+    ManagedClusterServicePrincipalProfile,
+)
+from azure.mgmt.dns import DnsManagementClient
 from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.network.models import (
+    AzureFirewall,
+    AzureFirewallIPConfiguration,
     NetworkInterface,
     NetworkSecurityGroup,
+    PrivateEndpoint,
+    PrivateLinkServiceConnection,
     PublicIPAddress,
     PublicIPAddressDnsSettings,
+    Route,
+    RouteTable,
     Subnet,
     VirtualNetwork,
+    VirtualNetworkPeering,
+)
+from azure.mgmt.privatedns import PrivateDnsManagementClient
+from azure.mgmt.privatedns.models import ARecord, PrivateZone, RecordSet, VirtualNetworkLink
+from azure.mgmt.rdbms.mysql import MySQLManagementClient
+from azure.mgmt.rdbms.mysql.models import (
+    ServerForCreate,
+    ServerPropertiesForDefaultCreate,
+    ServerVersion,
+    Sku,
+    StorageProfile,
 )
 from azure.mgmt.resource import ResourceManagementClient
 from azure.mgmt.storage import StorageManagementClient
+from azure.mgmt.storage.models import NetworkRuleSet
+from azure.mgmt.storage.models import Sku as StorageSku
+from azure.mgmt.storage.models import StorageAccountCreateParameters, VirtualNetworkRule
+from azure.storage.file import FileService
 
 
 class AzureManager(AzureApi):
@@ -547,3 +578,244 @@ class AzureManager(AzureApi):
             str: Azure location
         """
         return self.client(ResourceManagementClient).resource_groups.get(self.rsg).location
+
+    def create_storage_account(
+        self,
+        account_name: str,
+        subnets: List[str] = None,
+        sku: str = "Premium_LRS",
+        kind: str = "FileStorage",
+        access_tier: str = "Hot",
+    ) -> str:
+        self.logger.info("Creating storage account")
+
+        if subnets:
+            network_rules = NetworkRuleSet(
+                virtual_network_rules=[
+                    VirtualNetworkRule(action="Allow", virtual_network_resource_id=subnet) for subnet in set(subnets)
+                ],
+                default_action="Deny",
+                ip_rules=[],
+            )
+
+        else:
+            network_rules = NetworkRuleSet(
+                virtual_network_rules=[],
+                default_action="Allow",
+                ip_rules=[],
+            )
+
+        storage_account = self.client(StorageManagementClient).storage_accounts.create(
+            self.rsg,
+            account_name,
+            parameters=StorageAccountCreateParameters(
+                sku=StorageSku(name=sku),
+                kind=kind,
+                location=self.get_location(),
+                access_tier=access_tier,
+                allow_blob_public_access=False,
+                enable_https_traffic_only=True,
+                network_rule_set=network_rules,
+            ),
+        )
+        storage_account.result()
+
+        access_key = (
+            self.client(StorageManagementClient).storage_accounts.list_keys(self.rsg, account_name).keys[0].value
+        )
+
+        return access_key
+
+    def create_file_share(self, storage_account_name: str, share_name: str, size: int, key: str) -> FileService:
+        self.logger.info("Creating file share")
+        file_service = FileService(account_name=storage_account_name, account_key=key)
+        file_service.create_share(share_name, quota=size)
+
+        return file_service
+
+    def enable_vnet_service_endpoints(
+        self, rsg: str, vnet: str, subnet: str, disable_private_endpoint_policies: bool = False
+    ) -> None:
+        """Enable virtual network service endpoints for storage, SQL and KeyVault access
+
+        Args:
+            rsg (str): resource group of the virtual network
+            vnet (str): virtual network name
+            subnet (str): subnet name
+            disable_private_endpoint_policies (bool, optional): disable private endpoints. Defaults to False.
+        """
+        self.logger.info("Enabling vnet service endpoints")
+
+        subnetwork = self.client(NetworkManagementClient).subnets.get(rsg, vnet, subnet)
+
+        needed_endpoints = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault"]
+
+        if not subnetwork.service_endpoints:
+            enabled_endpoints = []
+            subnetwork.service_endpoints = []
+        else:
+            enabled_endpoints = [i.service for i in subnetwork.service_endpoints]
+        for endpoint in needed_endpoints:
+            if endpoint not in enabled_endpoints:
+                subnetwork.service_endpoints.append({"service": endpoint})
+
+        if disable_private_endpoint_policies:
+            subnetwork.private_endpoint_network_policies = "Disabled"
+
+        async_subnet_update = self.client(NetworkManagementClient).subnets.create_or_update(
+            rsg,
+            vnet,
+            subnet,
+            subnetwork,
+        )
+
+        subnet = async_subnet_update.result()
+
+        self.logger.info("Vnet service endpoints enabled")
+
+    def login_to_kubernetes_cluster(self, cluster_name: str) -> None:
+        """Login the kubectl CLI to AKS cluster described in the cluster configuration"""
+        self.logger.info("Logging in kubernetes CLI client to Intland cluster")
+
+        run_shell_command(
+            [
+                "az",
+                "aks",
+                "get-credentials",
+                "--resource-group",
+                self.rsg,
+                "--name",
+                cluster_name,
+                "--overwrite-existing",
+            ]
+        )
+
+    def create_dns_zone(self, zone: str) -> None:
+        """Create a public (global) DNS zone with given param ins cluster-config"""
+        _ = self.client(DnsManagementClient).zones.create_or_update(
+            self.rsg, zone, {"zone_type": "Public", "location": "global"}
+        )
+
+        ns_records = "\n".join(
+            [x.nsdname for x in self.client(DnsManagementClient).record_sets.get(self.rsg, zone, "@", "NS").ns_records]
+        )
+        self.logger.warning(
+            f"\n{'*'*80}\nPlease add the following NS records to your DNS record: {zone}\n{ns_records}\n{'*'*80}\n"
+        )
+
+    def private_dns_link_to_vnet(self, dns_rsg: str, dns_name: str, vnet_rsg: str, vnet_name: str) -> None:
+        """Link a private DNS zone to a virtual network
+
+        Args:
+            dns_rsg (str): resource group of the DNS zone
+            dns_name (str): name of the private DNS zone
+            vnet_rsg (str): resource group of the virtual network
+            vnet_name (str): name of the virtual network
+        """
+        self.logger.info(f"Linking private DNS {dns_name} to {vnet_name}")
+
+        params = VirtualNetworkLink(
+            location="global",
+            registration_enabled=False,
+            virtual_network={"id": self.get_vnet_id(vnet_rsg, vnet_name)},
+        )
+
+        link = self.client(PrivateDnsManagementClient).virtual_network_links.create_or_update(
+            dns_rsg,
+            dns_name,
+            vnet_name,
+            parameters=params,
+        )
+        _ = link.result()
+        self.logger.info(f"Private DNS is linked to VNET")
+
+    def create_private_dns_zone(self, zone: str, link_vnets: List[Tuple[str, str]]) -> None:
+        """Create private DNS zone in Azure
+
+        Args:
+            zone (str): domain name of the zone
+        """
+        self.logger.info(f"Creating private DNS zone: {zone}")
+        dns = self.client(PrivateDnsManagementClient).private_zones.create_or_update(
+            self.rsg, zone, PrivateZone(location="global")
+        )
+        dns = dns.result()
+
+        for vnet_rsg, vnet_name in link_vnets:
+            self.private_dns_link_to_vnet(
+                self.rsg,
+                zone,
+                vnet_rsg,
+                vnet_name,
+            )
+
+        self.logger.info("Private DNS Zone created, VNETs linked")
+
+    def dns_create_a_record(self, name: str, zone: str, public_ips: List[str]) -> None:
+        """Assign a public DNS A record to an IP address
+
+        Args:
+            name (str): name.<DNS zone>
+            public_ips (List[str]): list of public IP addresses
+        """
+        self.logger.info(f"Creating DNS record {name} for {public_ips}")
+        self.client(DnsManagementClient).record_sets.create_or_update(
+            self.rsg,
+            zone,
+            name,
+            "A",
+            {"ttl": 300, "arecords": [{"ipv4_address": ip} for ip in public_ips]},
+        )
+        self.logger.info("Record created")
+
+    def dns_delete_a_record(self, name: str, zone: str) -> None:
+        """Delete a public A record from the DNS zone
+
+        Args:
+            name (str): name of the record
+        """
+        self.logger.info(f"Deleting DNS record for {name}")
+        self.client(DnsManagementClient).record_sets.delete(
+            self.rsg,
+            zone,
+            name,
+            "A",
+        )
+
+    def private_dns_delete_a_record(self, name: str, zone: str) -> None:
+        """Delete a private DNS A record
+
+        Args:
+            name (str): name of the private DNS A record
+        """
+        self.logger.info(f"Deleting Private DNS record for {name}")
+        self.client(PrivateDnsManagementClient).record_sets.delete(
+            self.rsg,
+            zone,
+            "A",
+            name,
+        )
+
+    def private_dns_create_a_record(self, name: str, ip: str, zone: str = None) -> None:
+        """Create a Private DNS A record
+
+        Args:
+            name (str): name of the A record
+            ip (str): IP address
+            zone (str, optional): Zone of the A record. Defaults to None.
+        """
+        self.logger.info(f"Creating Private DNS record {name}.{zone} for {ip}")
+
+        if isinstance(ip, str):
+            ips = [ARecord(ipv4_address=ip)]
+        else:
+            ips = [ARecord(ipv4_address=i) for i in ip]
+
+        self.client(PrivateDnsManagementClient).record_sets.create_or_update(
+            self.rsg,
+            zone,
+            "A",
+            name,
+            RecordSet(ttl=3600, a_records=ips),
+        )
+        self.logger.info("DNS Record created.")
