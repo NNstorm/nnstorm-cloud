@@ -1,0 +1,73 @@
+#!python
+"""Example on how Azure VMs can be deployed using this API"""
+import argparse
+import logging
+import os
+import sys
+
+import coloredlogs
+from nnstorm_cloud.azure.manager import AzureManager
+from nnstorm_cloud.azure.virtual_machine import AzureVM
+
+
+def delete_cmd(args):
+    """Delete deployed VM"""
+    x = AzureManager(rsg=args.rsg, async_mode=False)
+    x.delete_rsg()
+
+
+def deploy_cmd(args):
+    """Deploy virtual machine"""
+    x = AzureManager(rsg=args.rsg, async_mode=False)
+
+    vm = AzureVM(x, args.name, spot_instance=True)
+    vm.deploy(image=x.config["ngc_image"], size=args.type, user=os.environ["USER"])
+    logging.info(f"The VM is reachable on: {vm.get_fqdn()}")
+
+
+if __name__ == "__main__":
+    coloredlogs.install(level="info")
+
+    parser = argparse.ArgumentParser(description="List, Deploy, Delete VMs in the Azure cloud.")
+    parser.add_argument(
+        "--loglevel",
+        type=str,
+        default="info",
+        help="Set the loglevel to debug, info, warning, error",
+    )
+
+    subparsers = parser.add_subparsers(help="actions")
+
+    # Deploy command
+    deploy_parser = subparsers.add_parser("deploy")
+    deploy_parser.set_defaults(func=deploy_cmd)
+
+    deploy_parser.add_argument("-n", "--name", type=str, help="Name of the vm(s)", required=True)
+    deploy_parser.add_argument("-r", "--rsg", type=str, help="Name of the Azure Resource Group", required=True)
+    deploy_parser.add_argument(
+        "-t",
+        "--type",
+        type=str,
+        help="Node type of m1,m2,m4,p1,p2,p4,v1,v2,v4,small,ps",
+    )
+    deploy_parser.add_argument("-c", "--count", type=int, help="Node count in the cluster from the given VM")
+
+    # Delete command
+    delete_parser = subparsers.add_parser("delete")
+    delete_parser.set_defaults(func=delete_cmd)
+
+    delete_parser.add_argument(
+        "-n",
+        "--name",
+        type=str,
+        help="Name of the vm(s) to delete, if not specified removing full resource group",
+    )
+    delete_parser.add_argument("-r", "--rsg", type=str, help="Name of the Azure Resource Group", required=True)
+
+    args = parser.parse_args()
+
+    if not hasattr(args, "func"):
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+
+    args.func(args)

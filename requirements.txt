@@ -1,5 +1,4 @@
 azure-cli-core==2.14.2
-azure-cli-telemetry==1.0.6
 azure-common==1.1.26
 azure-core==1.9.0
 azure-cosmos==4.2.0
@@ -21,11 +20,9 @@ azure-mgmt-privatedns==0.1.0
 azure-mgmt-rdbms==2.2.0
 azure-mgmt-resource==10.2.0
 azure-mgmt-storage==16.0.0
-azure-nspkg==3.0.2
 azure-storage-blob==12.6.0
 azure-storage-common==2.1.0
 azure-storage-file==2.1.0
-msrestazure==0.6.4
 
 coloredlogs
 

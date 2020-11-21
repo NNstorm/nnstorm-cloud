@@ -7,7 +7,7 @@ import string
 import sys
 import time
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import List, Tuple
 
 from msrestazure.azure_exceptions import CloudError
 from nnstorm_cloud.azure.api import AzureApi, AzureError
@@ -33,7 +33,6 @@ from azure.mgmt.network.models import (
     PublicIPAddressDnsSettings,
     Subnet,
     VirtualNetwork,
-    VirtualNetworkPeering,
 )
 from azure.mgmt.privatedns import PrivateDnsManagementClient
 from azure.mgmt.privatedns.models import ARecord, PrivateZone, RecordSet, VirtualNetworkLink
@@ -774,7 +773,7 @@ class AzureManager(AzureApi):
             name,
         )
 
-    def private_dns_create_a_record(self, name: str, ip: str, zone: str = None, rsg: str = None) -> None:
+    def private_dns_create_a_record(self, name: str, ip: str, zone: str, rsg: str = None) -> None:
         """Create a Private DNS A record
 
         Args:
