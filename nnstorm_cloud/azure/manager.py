@@ -40,7 +40,11 @@ from azure.mgmt.resource import ResourceManagementClient
 from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.storage.models import NetworkRuleSet
 from azure.mgmt.storage.models import Sku as StorageSku
-from azure.mgmt.storage.models import StorageAccountCreateParameters, VirtualNetworkRule
+from azure.mgmt.storage.models import (
+    StorageAccountCheckNameAvailabilityParameters,
+    StorageAccountCreateParameters,
+    VirtualNetworkRule,
+)
 from azure.storage.file import FileService
 
 
@@ -520,7 +524,9 @@ class AzureManager(AzureApi):
         Returns:
             bool: If the storage account name is available
         """
-        available = self.client(StorageManagementClient).storage_accounts.check_name_availability(name)
+        available = self.client(StorageManagementClient).storage_accounts.check_name_availability(
+            StorageAccountCheckNameAvailabilityParameters(name=name)
+        )
         return available.name_available
 
     def get_subnet_id(self, rsg: str, vnet_name: str, subnet_name: str) -> str:

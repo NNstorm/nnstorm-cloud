@@ -13,6 +13,7 @@ from nnstorm_cloud.azure.cred_wrapper import CredentialWrapper
 from azure.common.credentials import ServicePrincipalCredentials
 from azure.graphrbac import GraphRbacManagementClient
 from azure.identity import ClientSecretCredential
+from azure.mgmt.storage import StorageManagementClient
 
 
 class AzureError(RuntimeError):
@@ -164,6 +165,10 @@ class AzureApi:
         """
         if client_class.__name__ not in self._clients:
             self.logger.debug(f"Creating client: {client_class.__name__}")
-            self._clients[client_class.__name__] = client_class(self.credentials, self.subscription_id)
+
+            # TODO as Azure moves, this should be changed to use the common auth from azure.identity
+            cred = self.credentials if client_class != StorageManagementClient else self.client_secret_credentials
+
+            self._clients[client_class.__name__] = client_class(cred, self.subscription_id)
 
         return self._clients[client_class.__name__]

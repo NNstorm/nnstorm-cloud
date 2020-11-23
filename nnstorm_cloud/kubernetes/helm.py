@@ -130,7 +130,6 @@ class HelmAPI:
             controller_definition (Path, optional): controller definition. Defaults to None.
         """
         self.add_repo("ingress-nginx", "https://kubernetes.github.io/ingress-nginx")
-        self.add_repo("stable", "https://kubernetes-charts.storage.googleapis.com/")
 
         values = {
             "controller.replicaCount": replicas,

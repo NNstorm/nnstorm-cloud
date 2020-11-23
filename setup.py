@@ -1,6 +1,6 @@
 import setuptools
 
-VERSION = "0.4.4"
+VERSION = "0.4.5"
 
 with open("requirements.txt", "r") as f:
     reqs = [l.replace("\n", "") for l in f.readlines()]

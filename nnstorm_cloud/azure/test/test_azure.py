@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 
-import pytest
 from nnstorm_cloud.azure.api import AzureApi
 from nnstorm_cloud.azure.keyvault import AzureKeyVault
 from nnstorm_cloud.azure.manager import AzureManager
@@ -13,12 +12,22 @@ def test_api_init():
     api = AzureApi(auth)
 
 
+def test_object_id_fetch():
+    api = AzureApi(auth)
+    api.get_object_id()
+
+
 def test_kv_init():
     kv = AzureKeyVault("test-kv-1", auth)
 
 
 def test_manager_init():
     mgr = AzureManager("test-manager-0", auth_path=auth, location="westeurope", create_rsg=False)
+
+
+def test_storage_account_credentials():
+    mgr = AzureManager("test-manager-0", auth_path=auth, location="westeurope", create_rsg=False)
+    mgr.check_storage_available("abc")
 
 
 def test_manager_rsg_create():
