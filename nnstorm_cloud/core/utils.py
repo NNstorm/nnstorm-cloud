@@ -28,7 +28,7 @@ def run_shell_command(
         Tuple[str, str]: standard output and standard error as str
     """
     if not log:
-        log = logging.getLogger("nnstorm_shell")
+        log = logging.getLogger("shell")
 
     cmd = command_arg_list if isinstance(command_arg_list, str) else " ".join(command_arg_list)
     log.debug(f"Running shell script: {cmd}")
