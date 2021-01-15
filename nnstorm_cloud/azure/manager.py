@@ -658,7 +658,7 @@ class AzureManager(AzureApi):
 
     def login_to_kubernetes_cluster(self, cluster_name: str) -> None:
         """Login the kubectl CLI to AKS cluster described in the cluster configuration"""
-        self.logger.info("Logging in kubernetes CLI client to Intland cluster")
+        self.logger.info("Logging in kubernetes CLI client to cluster")
 
         run_shell_command(
             [

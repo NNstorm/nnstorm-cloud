@@ -5,7 +5,7 @@ from nnstorm_cloud.azure.api import AzureApi
 from nnstorm_cloud.azure.keyvault import AzureKeyVault
 from nnstorm_cloud.azure.manager import AzureManager
 
-auth = Path(os.environ["INTLAND_AZURE_AUTH_LOCATION"])
+auth = Path(os.environ["AZURE_AUTH_LOCATION"])
 
 
 def test_api_init():
